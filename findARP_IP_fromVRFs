@@ -1,0 +1,77 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Jun 28 19:08:03 2020
+
+@author: mustafa.yildirim
+"""
+#to be able to use following scripts, you need to have these libraries to be installed
+import paramiko
+import time
+import re
+import traceback
+
+#put your router/switch ip addresses below in list_1
+list_router=['192.168.1.1','192.168.1.2','192.168.1.12']
+
+username='XXXX' #put your username to login to router here
+password='YYYY*'#put your password to login to router here
+conn = paramiko.SSHClient()
+conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+abc=0
+uzu=len(list_router)
+for m in list_router:
+    list2=[]
+    abc=abc+1
+    try:
+        conn.connect(m, username=username, password=password, allow_agent=False, look_for_keys=False)
+        remote_conn = conn.invoke_shell() #Use invoke_shell to establish an 'interactive session'
+        time.sleep(4)
+        commandString = 'terminal length 0' #run this comment to expand the routers terminal line limitation
+        remote_conn.send(commandString + "\n")
+        time.sleep(0.5)
+        commandString = 'show vrf brief'
+        remote_conn.send(commandString + "\n")
+        time.sleep(3)        
+        output = remote_conn.recv(500000) #output byte.
+        output = output.decode('utf-8') #output now became string.
+        #print(output) if you want to see what output looks like
+        list1=output.splitlines() #received output became list
+        #print(list1)
+        for i in list1:
+            if 'ipv4' in i:
+                a=i.split()
+                list2.append(a[0])
+        print(m)
+        print(list2)
+        remote_conn.send('show ip arp' + '\n')
+        time.sleep(1)
+        for abce in list2:
+            print(abce)
+            commandString=f'show ip arp vrf {abce}'
+            remote_conn.send(commandString + "\n")
+            time.sleep(5)
+        time.sleep(0.5)
+        output2 = remote_conn.recv(900000)
+        output2 = output2.decode('utf-8')
+        ip = re.findall("\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", output2) #to capture ip addresses
+        uniqueiplist=list(set(ip))
+        if len(uniqueiplist)>60: #if there is more than 60 ip on the received output, I think no need to get all of them
+            print('I entered the if cuz ip address number is more than 60')
+            aaa=round(len(uniqueiplist)/30)
+            for ty in range(0,len(uniqueiplist)-30,aaa):
+                print(f'{uniqueiplist[ty]}|{m}',file=open('ios_ve_iosxe_arpsonuclari.txt','a+'))    
+        else:
+            print(m)
+            print('There are less than 60 ip addresses in the subjected vrf.Or maybe none : ).')
+            print(f'kindoferror|{m}',file=open('ios_ve_iosxe_arpsonuclari.txt','a+'))
+            for ty2 in uniqueiplist:
+                print(f'{ty2}|{m}',file=open('ios_ve_iosxe_arpsonuclari.txt','a+'))
+        remote_conn.send('exit' + '\n')
+        time.sleep(1)
+        conn.close()
+    except Exception:
+        traceback.print_exc()
+        print(f'{m}|error')
+        print(f'kindoferror|{m}',file=open('ios_ve_iosxe_arpsonuclari.txt','a+'))
+    print(f'{abc}/{uzu}')
+print('done')
